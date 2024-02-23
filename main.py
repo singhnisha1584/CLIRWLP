@@ -56,6 +56,8 @@ def parse_args():
 	parser.set_defaults(directed=False)
 	parser.add_argument('--res-type', type=int, default=1,
 	                    help='Set the result type. 1- Original Node2vec, 2- CC with Node2vec, 3- CLPID with Node2vec. Default is 1.')
+	parser.add_argument('--row', type=int, default=30,
+	                    help='Set the row number from where you want you result in xlxs file. Default is 30.')
 
 	return parser.parse_args()
 
@@ -122,7 +124,7 @@ def main(args):
 	G.preprocess_transition_probs()
 	walks = G.simulate_walks(args.num_walks, args.walk_length)
 	embedding_train = learn_embeddings(walks)
-	link_prediction.evaluate_link_prediction(embedding_train, nx_G, args.res_type)
+	link_prediction.evaluate_link_prediction(embedding_train, nx_G, args.res_type, args.row)
 	# values.append(value)
 	# print("\n#########Printing average of 10 itertions##########")
 	# val = np.array(values)

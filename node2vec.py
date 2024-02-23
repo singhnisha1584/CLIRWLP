@@ -92,14 +92,14 @@ class Graph():
     #print("Neighbour Nodes", sorted(G.neighbors(dst)))
     for dst_nbr in sorted(G.neighbors(dst)):
       if dst_nbr == src:        
-        unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/p)
-        #unnormalized_probs.append(G[dst][dst_nbr]['weight']/p)  
+        #unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/p)
+        unnormalized_probs.append(G[dst][dst_nbr]['weight']/p)  
       elif G.has_edge(dst_nbr, src):
-        unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr]))
-        #unnormalized_probs.append(G[dst][dst_nbr]['weight'])
+        #unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr]))
+        unnormalized_probs.append(G[dst][dst_nbr]['weight'])
       else:
-        unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/q)
-        #unnormalized_probs.append(G[dst][dst_nbr]['weight']/q)
+        #unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/q)
+        unnormalized_probs.append(G[dst][dst_nbr]['weight']/q)
     norm_const = sum(unnormalized_probs)
     #print("unnormalized_probs",unnormalized_probs)
     normalized_probs =  [float(u_prob)/norm_const for u_prob in unnormalized_probs if u_prob>0]
@@ -174,7 +174,12 @@ class Graph():
     sim_matrix = self.sim_matrix
     #print("Len of V in get_sim_matrix", sorted(G.nodes()))
     if res_type==3:
-      clpid=clp.clp_gen(G)
+      nodes = sorted(G.nodes())
+      is_0_based=True
+      print("initial node: ", nodes[0])
+      if nodes[0]!=0:
+        is_0_based = False
+      clpid=clp.clp_gen(G, is_0_based)
     for i in G.nodes():
       for j in G.nodes():        
         weight = 0

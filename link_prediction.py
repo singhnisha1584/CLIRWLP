@@ -21,7 +21,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 
 
-def evaluate_link_prediction(embedding_train, nx_G, res_type):
+def evaluate_link_prediction(embedding_train, nx_G, res_type, row_number):
 	WINDOW = 1 # Node2Vec fit window
 	MIN_COUNT = 1 # Node2Vec min. count
 	BATCH_WORDS = 4 # Node2Vec batch words
@@ -89,9 +89,9 @@ def evaluate_link_prediction(embedding_train, nx_G, res_type):
 		"gbt_clf",
 	]
 
-	excel_path = '/content/drive/MyDrive/mtp/CLIRWLP/results/cora_new_res.xlsx'
+	excel_path = '/content/drive/MyDrive/mtp/CLIRWLP/results/all_res.xlsx'
 	# excel_data = pd.read_excel(excel_path)
-	row_index = 2
+	row_index = row_number
 	wb = load_workbook(excel_path)
 	sheet = wb.active
 
@@ -104,13 +104,12 @@ def evaluate_link_prediction(embedding_train, nx_G, res_type):
 		data = eval_report(clf, x_train, y_train, x_test, y_test)
 		if res_type == 1:
 			data.insert(0,clf_name_list[i])
-		# result_list.append(value)
 		for i, value in enumerate(data):
 			if res_type == 1:
 				column_index = (i-1) * 3 + 1 if i!=0 else 0
 			else:
 				column_index = (i) * 3 + res_type
-			cell = sheet.cell(row=row_index + 1, column=column_index + 1)
+			cell = sheet.cell(row=row_index, column=column_index + 1)
 			cell.value = value
 		row_index += 1
 		wb.save(excel_path)

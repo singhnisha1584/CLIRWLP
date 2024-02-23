@@ -236,7 +236,11 @@ def clustering_main (G) :
     print("Returning from clustering_main")
     return link_pred
 
-def clp_gen(G):
+def clp_gen(G, is_0_based):
+    if is_0_based:
+      clpid = clustering_main(G)
+      return clpid
+    
     #for 0-based indexing
     # Create a new graph with 0-based indexing
     G_0_based = nx.Graph()
@@ -245,7 +249,7 @@ def clp_gen(G):
         G_0_based.add_edge(*edge_0_based)
     
     clpid = clustering_main(G_0_based)
-    #for 1-based indexing
+    #for returning 1-based indexing
     adj = nx.to_numpy_array(G)
     clpid_1_based = np.zeros((len(adj)+1, len(adj)+1))
     for i in range(len(clpid)):
