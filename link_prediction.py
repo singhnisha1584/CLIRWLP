@@ -1,26 +1,16 @@
 import numpy as np
 import networkx as nx
 import pandas as pd
-import math
 import random
-from statistics import mean
-from gensim.models import Word2Vec
-from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
-from itertools import product
 from sklearn.model_selection import train_test_split
 from openpyxl import load_workbook
-from statistics import mean
-from gensim.models import Word2Vec
-from gensim.models import KeyedVectors
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import StandardScaler
-from itertools import product
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import *
 from sklearn.naive_bayes import GaussianNB
@@ -31,7 +21,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 
 
-def evaluate_link_prediction(embedding_train, nx_G):
+def evaluate_link_prediction(embedding_train, nx_G, res_type):
 	WINDOW = 1 # Node2Vec fit window
 	MIN_COUNT = 1 # Node2Vec min. count
 	BATCH_WORDS = 4 # Node2Vec batch words
@@ -101,7 +91,7 @@ def evaluate_link_prediction(embedding_train, nx_G):
 
 	excel_path = '/content/drive/MyDrive/mtp/CLIRWLP/results/cora_new_res.xlsx'
 	# excel_data = pd.read_excel(excel_path)
-	row_index = 11
+	row_index = 2
 	wb = load_workbook(excel_path)
 	sheet = wb.active
 
@@ -112,12 +102,14 @@ def evaluate_link_prediction(embedding_train, nx_G):
 		# y_true = y_test
 		print("Results for ", clf_name_list[i], " :")
 		data = eval_report(clf, x_train, y_train, x_test, y_test)
-		# data.insert(0,clf_name_list[i])
+		if res_type == 1:
+			data.insert(0,clf_name_list[i])
 		# result_list.append(value)
 		for i, value in enumerate(data):
-			# column_index = (i-1) * 3 + 1 if i!=0 else 0
-			# column_index = (i) * 3 + 2
-			column_index = (i) * 3 + 3
+			if res_type == 1:
+				column_index = (i-1) * 3 + 1 if i!=0 else 0
+			else:
+				column_index = (i) * 3 + res_type
 			cell = sheet.cell(row=row_index + 1, column=column_index + 1)
 			cell.value = value
 		row_index += 1

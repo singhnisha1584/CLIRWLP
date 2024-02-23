@@ -1,26 +1,11 @@
 import argparse
 import numpy as np
 import networkx as nx
-import pandas as pd
 import node2vec
 import node2vec_original
 import link_prediction
-from sklearn.preprocessing import MinMaxScaler, normalize
-import math
 from gensim.models import Word2Vec
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegressionCV
-from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import StandardScaler
-from itertools import product
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, matthews_corrcoef, confusion_matrix, classification_report
-import scipy.sparse as sp
-import torch
-from torch import Tensor
-import os
 from torch_geometric.utils import to_networkx
-from torch_geometric.datasets import Planetoid
 
 
 
@@ -122,15 +107,22 @@ def main(args):
 	#generate weights and add to the file of edgelist
 	#genearte_weights()
 	nx_G = read_graph()
-  if(args.res-type)
-	G = node2vec.Graph(nx_G, args.directed, args.p, args.q)
-	G.get_sim_matrix()
-	print("Done with Similarity weght Matrix", G.sim_matrix[0], '\n',  G.sim_matrix[1], '\n', G.sim_matrix[2], '\n', G.sim_matrix[3], '\n')
+	if args.res_type == 1:
+		print("Runnning node2vec original")
+		G = node2vec_original.Graph(nx_G, args.directed, args.p, args.q)
+	else:
+		if args.res_type == 2:
+			print("Runnning cc (clustering coefficient) with node2vec")
+		elif args.res_type == 3:
+			print("Runnning clpid with node2vec")
+		G = node2vec.Graph(nx_G, args.directed, args.p, args.q, res_type=args.res_type)
+		G.get_sim_matrix()
+		print("Done with Similarity weght Matrix", G.sim_matrix[0], '\n',  G.sim_matrix[1], '\n', G.sim_matrix[2], '\n', G.sim_matrix[3], '\n')
 	# for i in range(10):
 	G.preprocess_transition_probs()
 	walks = G.simulate_walks(args.num_walks, args.walk_length)
 	embedding_train = learn_embeddings(walks)
-	link_prediction.evaluate_link_prediction(embedding_train, nx_G)
+	link_prediction.evaluate_link_prediction(embedding_train, nx_G, args.res_type)
 	# values.append(value)
 	# print("\n#########Printing average of 10 itertions##########")
 	# val = np.array(values)

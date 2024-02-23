@@ -2,17 +2,17 @@ from gensim import similarities
 import numpy as np
 import networkx as nx
 import random
-import link_prediction
 import os
 import math
 import clp
 
 class Graph():
-  def __init__(self, nx_G, is_directed, p, q):
+  def __init__(self, nx_G, is_directed, p, q, res_type):
     self.G = nx_G
     self.is_directed = is_directed
     self.p = p
     self.q = q
+    self.res_type = res_type
     self.V = len(nx_G.nodes())+3
     #print("Length of nodes = ", self.V)
     #exit()
@@ -170,9 +170,11 @@ class Graph():
   def get_sim_matrix(self):
     print("Inside get_sim_matrix")
     G = self.G
+    res_type = self.res_type
     sim_matrix = self.sim_matrix
     #print("Len of V in get_sim_matrix", sorted(G.nodes()))
-    clpid=clp.clp_gen(G)
+    if res_type==3:
+      clpid=clp.clp_gen(G)
     for i in G.nodes():
       for j in G.nodes():        
         weight = 0
@@ -210,29 +212,35 @@ class Graph():
                 triangles_dict[k] = triangles_curr
               cclp += triangles_curr / (G.degree(k) * (G.degree(k) - 1) / 2) 
         weight += cclp'''
-        #Clustering Coeficcient of L2
-        # cc = 0
-        # n1 = G.neighbors(i)
-        # n2 = G.neighbors(j)	
-        # cluster_i = n1
-        # cluster_j = n2
-        # #cn = len(sorted(nx.common_neighbors(G, i, j)))
-        # #l = len(list(n1)) + len(list(n2)) - cn
-        # '''for in1 in n1:
-        #   #cluster_i.append(G.neighbors(in1))	
-        #   cluster_i = set().union(cluster_i, G.neighbors(in1))
-        # for in2 in n2:  
-        #   #cluster_j.append(G.neighbors(in2))
-        #   cluster_j = set().union(cluster_j, G.neighbors(in2))'''
-        # for p in cluster_i:
-        #   for q in cluster_j:
-        #     if G.has_edge(p, q):              
-        #       cc += 1
-        # weight += cc
+
+        # Clustering Coeficcient of L2
+        if res_type == 2:
+          cc = 0
+          n1 = G.neighbors(i)
+          n2 = G.neighbors(j)	
+          cluster_i = n1
+          cluster_j = n2
+          #cn = len(sorted(nx.common_neighbors(G, i, j)))
+          #l = len(list(n1)) + len(list(n2)) - cn
+          '''for in1 in n1:
+            #cluster_i.append(G.neighbors(in1))	
+            cluster_i = set().union(cluster_i, G.neighbors(in1))
+          for in2 in n2:  
+            #cluster_j.append(G.neighbors(in2))
+            cluster_j = set().union(cluster_j, G.neighbors(in2))'''
+          for p in cluster_i:
+            for q in cluster_j:
+              if G.has_edge(p, q):              
+                cc += 1
+          weight += cc
 
 
         #CLPID
-        weight = clpid[i][j]
+        elif res_type == 3:
+          weight = clpid[i][j]
+
+        else:
+          print("invalid res_type")
 
         #print("i=",i," j=", j)
         sim_matrix[i][j] = weight
@@ -240,7 +248,7 @@ class Graph():
           print("i=",i," j=", j)
           exit()'''
     
-    print("returning from get_sim_matrix")
+    print("Returning from get_sim_matrix")
     return sim_matrix
 
 
