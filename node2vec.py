@@ -5,6 +5,7 @@ import random
 import link_prediction
 import os
 import math
+import clp
 
 class Graph():
   def __init__(self, nx_G, is_directed, p, q):
@@ -91,14 +92,14 @@ class Graph():
     #print("Neighbour Nodes", sorted(G.neighbors(dst)))
     for dst_nbr in sorted(G.neighbors(dst)):
       if dst_nbr == src:        
-        #unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/p)
-        unnormalized_probs.append(G[dst][dst_nbr]['weight']/p)  
+        unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/p)
+        #unnormalized_probs.append(G[dst][dst_nbr]['weight']/p)  
       elif G.has_edge(dst_nbr, src):
-        #unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr]))
-        unnormalized_probs.append(G[dst][dst_nbr]['weight'])
+        unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr]))
+        #unnormalized_probs.append(G[dst][dst_nbr]['weight'])
       else:
-        #unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/q)
-        unnormalized_probs.append(G[dst][dst_nbr]['weight']/q)
+        unnormalized_probs.append((self.sim_matrix[src][dst_nbr] + self.sim_matrix[dst][dst_nbr])/q)
+        #unnormalized_probs.append(G[dst][dst_nbr]['weight']/q)
     norm_const = sum(unnormalized_probs)
     #print("unnormalized_probs",unnormalized_probs)
     normalized_probs =  [float(u_prob)/norm_const for u_prob in unnormalized_probs if u_prob>0]
@@ -167,9 +168,11 @@ class Graph():
     return
   
   def get_sim_matrix(self):
+    print("Inside get_sim_matrix")
     G = self.G
     sim_matrix = self.sim_matrix
     #print("Len of V in get_sim_matrix", sorted(G.nodes()))
+    clpid=clp.clp_gen(G)
     for i in G.nodes():
       for j in G.nodes():        
         weight = 0
@@ -208,31 +211,36 @@ class Graph():
               cclp += triangles_curr / (G.degree(k) * (G.degree(k) - 1) / 2) 
         weight += cclp'''
         #Clustering Coeficcient of L2
-        cc = 0
-        n1 = G.neighbors(i)
-        n2 = G.neighbors(j)	
-        cluster_i = n1
-        cluster_j = n2
-        #cn = len(sorted(nx.common_neighbors(G, i, j)))
-        #l = len(list(n1)) + len(list(n2)) - cn
-        '''for in1 in n1:
-          #cluster_i.append(G.neighbors(in1))	
-          cluster_i = set().union(cluster_i, G.neighbors(in1))
-        for in2 in n2:  
-          #cluster_j.append(G.neighbors(in2))
-          cluster_j = set().union(cluster_j, G.neighbors(in2))'''
-        for p in cluster_i:
-          for q in cluster_j:
-            if G.has_edge(p, q):              
-              cc += 1
-        weight += cc
+        # cc = 0
+        # n1 = G.neighbors(i)
+        # n2 = G.neighbors(j)	
+        # cluster_i = n1
+        # cluster_j = n2
+        # #cn = len(sorted(nx.common_neighbors(G, i, j)))
+        # #l = len(list(n1)) + len(list(n2)) - cn
+        # '''for in1 in n1:
+        #   #cluster_i.append(G.neighbors(in1))	
+        #   cluster_i = set().union(cluster_i, G.neighbors(in1))
+        # for in2 in n2:  
+        #   #cluster_j.append(G.neighbors(in2))
+        #   cluster_j = set().union(cluster_j, G.neighbors(in2))'''
+        # for p in cluster_i:
+        #   for q in cluster_j:
+        #     if G.has_edge(p, q):              
+        #       cc += 1
+        # weight += cc
+
+
+        #CLPID
+        weight = clpid[i][j]
+
         #print("i=",i," j=", j)
         sim_matrix[i][j] = weight
         '''except:
           print("i=",i," j=", j)
           exit()'''
-
-
+    
+    print("returning from get_sim_matrix")
     return sim_matrix
 
 
@@ -245,7 +253,7 @@ def alias_setup(probs):
 
   K = len(probs)
   q = np.zeros(K)
-  J = np.zeros(K, dtype=np.int)
+  J = np.zeros(K, dtype=int)
 
   smaller = []
   larger = []

@@ -12,7 +12,24 @@ from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
 from itertools import product
 from sklearn.model_selection import train_test_split
+from openpyxl import load_workbook
+from statistics import mean
+from gensim.models import Word2Vec
+from gensim.models import KeyedVectors
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.metrics import roc_auc_score
+from sklearn.preprocessing import StandardScaler
+from itertools import product
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import *
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+
 
 def evaluate_link_prediction(embedding_train, nx_G):
 	WINDOW = 1 # Node2Vec fit window
@@ -53,15 +70,63 @@ def evaluate_link_prediction(embedding_train, nx_G):
 
 	# train test split
 	x_train, x_test, y_train, y_test = train_test_split(X,	y,	test_size = 0.3	)
-	rfc_clf = RandomForestClassifier(n_estimators=100, criterion='gini', max_depth=None, min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_features='auto', max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, oob_score=False, n_jobs=None, random_state=None, verbose=0, warm_start=False, class_weight=None, ccp_alpha=0.0, max_samples=None)
-	clf = Pipeline(steps=[("sc", StandardScaler()), ("clf", rfc_clf)])
-	clf.fit(x_train, y_train)
-	y_pred = clf.predict(x_test)
-	y_true = y_test
+	lr_clf = LogisticRegressionCV(Cs=10, cv=10, scoring="roc_auc", max_iter=max_iter)
+	knn_clf = KNeighborsClassifier(n_neighbors=5, weights='uniform', algorithm='auto', leaf_size=30, p=2, metric='minkowski', metric_params=None, n_jobs=None)
+	lda_clf = LinearDiscriminantAnalysis(solver='svd', shrinkage=None, priors=None, n_components=None, store_covariance=False, tol=0.0001)
+	gnb_clf = GaussianNB(priors=None, var_smoothing=1e-09)
+
+	rf_clf = RandomForestClassifier(n_estimators=100, criterion='gini', max_depth=None, min_samples_split=2, min_samples_leaf=1, 
+				 min_weight_fraction_leaf=0.0, max_leaf_nodes=None, min_impurity_decrease=0.0, bootstrap=True, oob_score=False, 
+				 n_jobs=None, random_state=None, verbose=0, warm_start=False, class_weight=None, ccp_alpha=0.0, max_samples=None)
+         
+	sv_clf = SVC(C=1.0, kernel='rbf', degree=3, gamma='scale', coef0=0.0, shrinking=True, probability=True, tol=0.001, cache_size=200, 
+	      class_weight=None, verbose=False, max_iter= -1, decision_function_shape='ovr', break_ties=False, random_state=None)
+        
+	gbt_clf = GradientBoostingClassifier(loss='log_loss', learning_rate=0.1, n_estimators=100, subsample=1.0, 
+				      criterion='friedman_mse', min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0, max_depth=5, 
+					  min_impurity_decrease=0.0, init=None, random_state=None, max_features=None, verbose=0, 
+					  max_leaf_nodes=None, warm_start=False, validation_fraction=0.1, n_iter_no_change=None, tol=0.0001, ccp_alpha=0.0)
+  
+	result_list = []
+	clf_list = [lr_clf, knn_clf, lda_clf, gnb_clf, rf_clf, sv_clf, gbt_clf]
+	clf_name_list = [
+		"lr_clf",
+		"knn_clf",
+		"lda_clf",
+		"gnb_clf",
+		"rf_clf",
+		"sv_clf",
+		"gbt_clf",
+	]
+
+	excel_path = '/content/drive/MyDrive/mtp/CLIRWLP/results/cora_new_res.xlsx'
+	# excel_data = pd.read_excel(excel_path)
+	row_index = 11
+	wb = load_workbook(excel_path)
+	sheet = wb.active
+
+	for i, clf in enumerate(clf_list):
+		# clf = Pipeline(steps=[("sc", StandardScaler()), ("clf", clf)])
+		clf.fit(x_train, y_train)
+		# y_pred = clf.predict(x_test)
+		# y_true = y_test
+		print("Results for ", clf_name_list[i], " :")
+		data = eval_report(clf, x_train, y_train, x_test, y_test)
+		# data.insert(0,clf_name_list[i])
+		# result_list.append(value)
+		for i, value in enumerate(data):
+			# column_index = (i-1) * 3 + 1 if i!=0 else 0
+			# column_index = (i) * 3 + 2
+			column_index = (i) * 3 + 3
+			cell = sheet.cell(row=row_index + 1, column=column_index + 1)
+			cell.value = value
+		row_index += 1
+		wb.save(excel_path)
+	
+	return
 
 	
-	value = eval_report(clf, x_train, y_train, x_test, y_test)
-	return value
+	
 
 def gen_rand_edges(teCt, unique_nodes):
 	num = 3*len(teCt)
