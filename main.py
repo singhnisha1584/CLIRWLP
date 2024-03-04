@@ -1,4 +1,5 @@
 import argparse
+from multiprocessing import process
 import numpy as np
 import networkx as nx
 import pandas as pd
@@ -18,6 +19,7 @@ import scipy.sparse as sp
 import torch
 from torch import Tensor
 import os
+import multiprocessing
 def parse_args():
 	'''
 	Parses the node2vec arguments.
@@ -65,23 +67,14 @@ def parse_args():
 	parser.set_defaults(directed=False)
 
 	return parser.parse_args()
-
-
-
-  
-
-def read_graph():
+def read_graph(snap):
 	'''
 	Reads the input network in networkx.
 	'''
-	'''G = nx.Graph()
-	#graph.add_nodes_from(node_set)
-	G.add_edges_from(edge_list)
-	G.remove_edges_from(nx.selfloop_edges(G))'''
 	if args.weighted:
-		G = nx.read_edgelist(args.input, nodetype=int, data=(('weight',float),), create_using=nx.DiGraph())
+		G = nx.from_edgelist(snap, create_using=nx.DiGraph())
 	else:
-		G = nx.read_edgelist(args.input, nodetype=int, create_using=nx.DiGraph())
+		G = nx.from_edgelist(snap, create_using=nx.DiGraph())
 		for edge in G.edges():
 			G[edge[0]][edge[1]]['weight'] = 1
 
@@ -89,43 +82,139 @@ def read_graph():
 		G = G.to_undirected()
 	return G
 
-
-
 def learn_embeddings(walks):
 	'''
 	Learn embeddings by optimizing the Skipgram objective using SGD.
 	'''
 	walks = [list(map(str, walk)) for walk in walks]
 	model = Word2Vec(walks, vector_size=args.dimensions, window=args.window_size, min_count=0, sg=1, workers=args.workers, epochs=args.iter)
-	model.wv.save_word2vec_format(args.output)
+	#model.wv.save_word2vec_format(args.output)
 	print("Embeddings saved to file successfully")
 	
 	#return
 	return model
 
+def data(m, t):
+    data = open("/content/drive/MyDrive/Thesis2/Datasets/" + t + ".txt")
+    edgelist = map(lambda q: list(map(int, q.split())),
+                   data.read().split("\n")[:-1])
+    data.close()
+    maxi = 0
+    mini = 10000000000
+    edgelist = list(edgelist)
+    for x in edgelist:
+        if x[-1] > maxi:
+            maxi = x[-1]
+        if x[-1] < mini:
+            mini = x[-1]
+    min1 = mini
+    w = int((maxi - mini) / m)
+    edgelist.sort(key=lambda x: x[-1])
+    arr = []
+    i = 0
+    for i in range(0, m + 1):
+        arr = arr + [min1 + w * i]
+    arri = []
+    # print(arr)
+    nodes = set()
+    for i in range(0, m):
+        temp = []
+        for j in edgelist:
+            if j[-1] >= arr[i] and j[-1] <= arr[i + 1]:
+                temp += [[j[0], j[1]]]
+        arri += [temp]
+    # print(arri)
+    # for x in arri:
+    #     print(len(x))
+    print("after read")
+    return arri
+
+def gen_graph(l):
+    print("inside gen graph")
+    t_graph = []
+    node_set = set()
+    max = -99999
+    min = 99999
+    for i in l:
+        for edge in i:
+            node_set.add(edge[0])
+            node_set.add(edge[1])
+            u = edge[0]
+            v = edge[1]
+            if u<v:
+                if min > u:
+                   min = u
+                if max < v:
+                    max = v
+            else:
+                if min > v:
+                   min = v
+                if max < u:
+                    max = u
+    print(str(min) + "-" + str(max))
+    #sys.exit()
+    edgelist_new = []
+    count = -1
+    for i in l:
+        graph = nx.Graph()
+        #graph.add_nodes_from(node_set)
+        graph.add_edges_from(i)
+        graph.remove_edges_from(nx.selfloop_edges(graph))
+        t_graph.append(graph)
+        edgelist_new.append(list(graph.edges))
+    return [t_graph,edgelist_new]
   
 def main(args):
 	'''
 	Pipeline for representational learning for all nodes in a graph.
 	'''
-	values = []
-	#generate weights and add to the file of edgelist
-	#genearte_weights()
-	nx_G = read_graph()
-	G = node2vec.Graph(nx_G, args.directed, args.p, args.q)
-	G.get_sim_matrix()
-	#print("Done with Similarity weght Matrix", G.sim_matrix)
-	for i in range(10):
+	l1 = data(5, "CollegeMsg")
+	l = []
+  #######For appending '0's for non exixtant snapshot##########
+	full_edgelist = list()
+	for i in l1:
+		edgelist = list(set(tuple(sorted(sub)) for sub in i))
+		full_edgelist.extend(list(edgelist))
+		l.append(edgelist)
+	G_master = read_graph(full_edgelist)
+	print(G_master)
+	l = gen_graph(l)[1]
+	embed_dict = dict()
+	G = node2vec.Graph(G_master, args.directed, args.p, args.q)
+	manager = multiprocessing.Manager()
+	return_dict = manager.dict()
+	process1 = multiprocessing.Process(target=G.get_sim_matrix, args =(1,return_dict,))
+	process2 = multiprocessing.Process(target=G.get_sim_matrix, args =(2,return_dict,))
+	process3 = multiprocessing.Process(target=G.get_sim_matrix, args =(3,return_dict,))
+	process4 = multiprocessing.Process(target=G.get_sim_matrix, args =(4,return_dict,))
+	process1.start()
+	process2.start()
+	process3.start()
+	process4.start()
+	process1.join()
+	process2.join()
+	process3.join()
+	process4.join()
+	G.sim_matrix = {**return_dict[0],**return_dict[1], **return_dict[2], **return_dict[3]}
+	#G.get_sim_matrix()
+	print("Done with Similarity weght Matrix")  #, G.sim_matrix
+	for i in range(4):
+		nx_G = read_graph(l[i])
+		G = node2vec.Graph(nx_G, args.directed, args.p, args.q)
 		G.preprocess_transition_probs()
 		walks = G.simulate_walks(args.num_walks, args.walk_length)
-		learn_embeddings(walks)
-		embedding_train = learn_embeddings(walks)
-		value = link_prediction.evaluate_link_prediction(embedding_train, nx_G)
-		values.append(value)
-	print("\n#########Printing average of 10 itertions##########")
-	val = np.array(values)
-	print(val)
-	print(np.array2string(np.average(val, axis=0), separator='\n'))
+		mdl = learn_embeddings(walks)
+		vector = np.zeros(args.dimensions)
+		for n in G_master.nodes():
+			try:
+				vector = mdl.wv.get_vector(str(n))
+			except KeyError:
+				vector = np.zeros(args.dimensions)
+			if n in embed_dict:
+				np.append(embed_dict[n], vector, axis=0)
+			else:
+				embed_dict[n] = vector
+	value = link_prediction.evaluate_link_prediction(embed_dict, nx_G, l[4])
 
 if __name__ == "__main__":
 	args = parse_args()
