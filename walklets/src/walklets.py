@@ -33,8 +33,8 @@ class WalkletMachine:
         del self.walker
 
         self.create_embedding()
-        # value = link_prediction.evaluate_link_prediction(list(self.embedding), self.graph, self.args.startrow)
-        # self.values.append(value)
+        value = link_prediction.evaluate_link_prediction(list(self.embedding), self.graph, self.args.startrow)
+        self.values.append(value)
         self.save_model()
 
 
