@@ -5,6 +5,8 @@ import random
 import link_prediction
 import os
 import math
+import clp
+
 
 class Graph():
   def __init__(self, nx_G, is_directed, p, q):
@@ -12,10 +14,12 @@ class Graph():
     self.is_directed = is_directed
     self.p = p
     self.q = q
-    self.V = len(nx_G.nodes())+3
+    self.N = sorted(nx_G.nodes())
+    self.V = len(self.N)+3
     #print("Length of nodes = ", self.V)
     #exit()
-    self.sim_matrix = [[0 for x in range(self.V)] for y in range(self.V)]
+    self.sim_matrix = np.zeros((self.V, self.V), int)
+    #self.sim_matrix = dict()
 
   def node2vec_walk(self, walk_length, start_node):
     '''
@@ -38,22 +42,18 @@ class Graph():
           walk.append(cur_nbrs[alias_draw(alias_nodes[cur][0], alias_nodes[cur][1])])
         else:
           prev = walk[-2]          
-          if(np.random.rand()< alpha):
+          if(np.random.rand() < alpha):
             if alias_edges_nbr.get((prev, cur)) is None:
               alias_edges_nbr[(prev, cur)] = self.get_alias_edge_nbr(prev, cur)
             next = cur_nbrs[alias_draw(alias_edges_nbr[(prev, cur)][0], alias_edges_nbr[(prev, cur)][1])]
           else:            
-            #print("cur->", cur, "prev->", prev)
-            cur_prev_sim = [self.sim_matrix[prev][i] + self.sim_matrix[cur][i] for i in range(0, self.V)]   #        
-            sim_weights = sorted(cur_prev_sim)[-10:]
-            #print("Similarity array of cur and prev", sim_weights)            
-            sim_nodes = [(cur_prev_sim.index(wt)+1) for wt in sim_weights ] #if wt>0]
+            cluster = sorted(set(G.neighbors(cur)).union(set(G.neighbors(prev))))
             #print("Similar node Lsit",sim_nodes)
             if alias_edges_sim.get((prev, cur)) is None:
               alias_edges_sim[(prev, cur)] = self.get_alias_edge_sim(prev, cur)
             #print("Prob distribution",alias_edges_sim[(prev, cur)][0])
             #print("Prob distribution",alias_edges_sim[(prev, cur)][1])            
-            next = sim_nodes[alias_draw(alias_edges_sim[(prev, cur)][0], alias_edges_sim[(prev, cur)][1])]
+            next = cluster[alias_draw(alias_edges_sim[(prev, cur)][0], alias_edges_sim[(prev, cur)][1])]
             #print("next node", next)
             #exit()          
           walk.append(next)
@@ -62,21 +62,40 @@ class Graph():
 
     return walk
 
-  def simulate_walks(self, num_walks, walk_length):
-      '''
+  '''def simulate_walks(self, idx, num_walks, walk_length, return_dict):
       Repeatedly simulate random walks from each node.
-      '''
+      
       G = self.G
       walks = []
-      nodes = list(G.nodes())
+      nodes = self.N
+      size = int(self.V/4)
+      chunk = self.N[size*(idx-1):size*idx]
       print('Walk iteration:')
       for walk_iter in range(num_walks):
         print(str(walk_iter+1), '/', str(num_walks))
-        random.shuffle(nodes)
-        for node in nodes:
+        random.shuffle(chunk)
+        for node in chunk:
           walks.append(self.node2vec_walk(walk_length=walk_length, start_node=node))
+      
+      return_dict[idx-1] = walks
+      print("Thread", idx, "completed")
+      return walks'''
+    
+  def simulate_walks(self, num_walks, walk_length):
+    '''
+    Repeatedly simulate random walks from each node.
+    '''
+    G = self.G
+    walks = []
+    nodes = list(G.nodes())
+    print('Walk iteration:')
+    for walk_iter in range(num_walks):
+      print(str(walk_iter+1), '/', str(num_walks))
+      random.shuffle(nodes)
+      for node in nodes:
+        walks.append(self.node2vec_walk(walk_length=walk_length, start_node=node))
 
-      return walks
+    return walks
 
   def get_alias_edge_nbr(self, src, dst):
     '''
@@ -118,12 +137,19 @@ class Graph():
       q = self.q	
       normalized_probs = 0
       unnormalized_probs = []
+      N = self.N
+      is_0_based=True
+      if N[0]!=0:
+        is_0_based = False      
       ## Taking  similar nodes for both current and prev node ##
-      cur_prev_sim = [self.sim_matrix[src][i] + self.sim_matrix[dst][i] for i in range(0, self.V)] #
-      sim_weights = sorted(cur_prev_sim)[-10:]      
-      sim_nodes = [(cur_prev_sim.index(wt)+1) for wt in sim_weights ] #if wt>0]      
-      for sim_weight in sim_weights:  
-        #if sim_weight>0:    
+      cluster = sorted(set(G.neighbors(src)).union(set(G.neighbors(dst))) )
+      if is_0_based:
+        sim_weights = [self.sim_matrix[src][i] + self.sim_matrix[dst][i] for i in cluster] 
+      else:
+        sim_weights = [self.sim_matrix[src-1][i-1] + self.sim_matrix[dst-1][i-1] for i in cluster]   
+      for idx, sim_weight in enumerate(sim_weights):
+        if(cluster[idx] == src):
+            sim_weight = sim_weight/p  
         unnormalized_probs.append(sim_weight)
         norm_const = sum(unnormalized_probs)
       normalized_probs =  [float(u_prob)/norm_const for u_prob in unnormalized_probs if u_prob>0]         
@@ -138,9 +164,9 @@ class Graph():
     normalized_probs = 0
     alias_nodes = {}
 	
-    for node in G.nodes():
-      unnormalized_probs = [self.sim_matrix[node][nbr] for nbr in sorted(G.neighbors(node))]
-      #unnormalized_probs = [G[node][nbr]['weight'] for nbr in sorted(G.neighbors(node))] 
+    for node in self.N:
+      #unnormalized_probs = [self.sim_matrix.get((node,nbr), 0) for nbr in sorted(G.neighbors(node))]
+      unnormalized_probs = [G[node][nbr]['weight'] for nbr in sorted(G.neighbors(node))] 
       norm_const = sum(unnormalized_probs)
       normalized_probs =  [float(u_prob)/norm_const for u_prob in unnormalized_probs if u_prob>0]
       alias_nodes[node] = alias_setup(normalized_probs)
@@ -166,73 +192,40 @@ class Graph():
 
     return
   
-  def get_sim_matrix(self):
+  def get_sim_matrix(self):         #, idx, return_dict
     G = self.G
     sim_matrix = self.sim_matrix
-    #print("Len of V in get_sim_matrix", sorted(G.nodes()))
-    for i in G.nodes():
-      for j in G.nodes():        
-        weight = 0
-        #try:
-        if i==j:
-          sim_matrix[i][j] = weight
-          continue
-        '''#l3
-        l3 = 0	
-        for intermediate_node1 in G.neighbors(i):	
-          for intermediate_node2 in G.neighbors(intermediate_node1):	
-            if G.has_edge(j, intermediate_node2):	
-              l3 += 1 / math.sqrt(	
-                G.degree[intermediate_node1] * G.degree[intermediate_node2]) # * ((math.log(weight1) + math.log(weight2))/2)		
-        weight += l3
-        # cclp index
-        cclp = 0
-        triangles_dict = dict()
-        cn = len(sorted(nx.common_neighbors(G, i, j)))
-        common_n = nx.common_neighbors(G, i, j)
-        if cn > 0:
-          for k in common_n:
-            if G.degree(k) > 1:
-              triangles_curr = 0
-              if k in triangles_dict.keys():
-                triangles_curr = triangles_dict[k]
-              else:
-                n1_all = G.neighbors(k)
-                n2_all = G.neighbors(k)
-                for n1 in n1_all:
-                  for n2 in n2_all:
-                    if n1 != n2 and G.has_edge(n1, n2):
-                      triangles_curr += 1
-                triangles_curr = triangles_curr / 2
-                triangles_dict[k] = triangles_curr
-              cclp += triangles_curr / (G.degree(k) * (G.degree(k) - 1) / 2) 
-        weight += cclp'''
-        #Clustering Coeficcient of L2
-        cc = 0
-        n1 = G.neighbors(i)
-        n2 = G.neighbors(j)	
-        cluster_i = n1
-        cluster_j = n2
-        #cn = len(sorted(nx.common_neighbors(G, i, j)))
-        #l = len(list(n1)) + len(list(n2)) - cn
-        '''for in1 in n1:
-          #cluster_i.append(G.neighbors(in1))	
-          cluster_i = set().union(cluster_i, G.neighbors(in1))
-        for in2 in n2:  
-          #cluster_j.append(G.neighbors(in2))
-          cluster_j = set().union(cluster_j, G.neighbors(in2))'''
-        for p in cluster_i:
-          for q in cluster_j:
-            if G.has_edge(p, q):              
-              cc += 1
-        weight += cc
-        #print("i=",i," j=", j)
-        sim_matrix[i][j] = weight
-        '''except:
-          print("i=",i," j=", j)
-          exit()'''
+    N = self.N
+    is_0_based=True
+    if N[0]!=0:
+      is_0_based = False
+    clpid=clp.clp_gen(G, is_0_based)
+    '''size = int(self.V/4)
+    chunk = N[size*(idx-1):size*idx]
+    for i in chunk:
+      for j in N:   
+        if sim_matrix.get((i,j)) is None:
+            weight = 0
+            #Clustering Coeficcient of L2
+            cc = 0
+            n1 = G.neighbors(i)
+            n2 = G.neighbors(j)	
+            cluster_i = n1
+            cluster_j = n2
+            #cn = len(sorted(nx.common_neighbors(G, i, j)))          
+            for p in cluster_i:
+                for q in cluster_j:
+                    if G.has_edge(p, q):              
+                        cc += 1
+            weight += cc
+            #print("i=",i," j=", j)
+            if weight != 0 :
+                sim_matrix[(i,j)] = weight
+                sim_matrix[(j,i)] = weight'''
 
-
+    '''print("thread", idx, "completed")
+    return_dict[idx-1] = sim_matrix'''
+    self.sim_matrix = clpid
     return sim_matrix
 
 
@@ -245,7 +238,7 @@ def alias_setup(probs):
 
   K = len(probs)
   q = np.zeros(K)
-  J = np.zeros(K, dtype=np.int)
+  J = np.zeros(K, dtype=np.int_)
 
   smaller = []
   larger = []
